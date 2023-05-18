@@ -5,22 +5,30 @@ const { requestToOpenAi } = require("./lib/requestToOpenAi");
 
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 
+function getPrettyJapanDatetimeString(date) {
+  // cancel timezone offset
+  const utcDate = new Date(
+    date.getTime() + date.getTimezoneOffset() * 60 * 1000
+  );
+  const japanDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+
+  const year = japanDate.getFullYear();
+  const month = japanDate.getMonth() + 1;
+  const day = japanDate.getDate();
+  const hourStr = `0${japanDate.getHours()}`.slice(-2);
+  const minuteStr = `0${japanDate.getMinutes()}`.slice(-2);
+  const secondStr = `0${japanDate.getSeconds()}`.slice(-2);
+  return `${year}/${month}/${day} ${hourStr}:${minuteStr}:${secondStr}`;
+}
+
 async function main() {
-  const botInfo = await requestToSlack("/api/users.profile.get", "GET", {});
-
-  if (!botInfo.ok) {
-    throw new Error(`botInfo.ok is false: ${botInfo.error}`);
-  }
-
-  await sleep(500);
-
   const conversationsHistory = await requestToSlack(
     "/api/conversations.history",
     "POST",
     {
       bodyObj: {
         channel: SLACK_CHANNEL_ID,
-        limit: 10,
+        limit: 20,
       },
     }
   );
@@ -36,12 +44,21 @@ async function main() {
     return;
   }
 
-  if (
-    conversationsHistory.messages[0].bot_profile?.id === botInfo.profile.bot_id
-  ) {
-    console.log("Bot has already spoken");
+  // read the last message ts
+  const lastMessageTs = fs
+    .readFileSync(`${__dirname}/lastMessageTs.txt`)
+    .toString();
+
+  if (conversationsHistory.messages[0].ts === lastMessageTs) {
+    console.log("No new messages");
     return;
   }
+
+  // save the last message ts
+  fs.writeFileSync(
+    `${__dirname}/lastMessageTs.txt`,
+    conversationsHistory.messages[0].ts
+  );
 
   const uniqueUsers = conversationsHistory.messages
     .map((message) => message.user)
@@ -62,18 +79,41 @@ async function main() {
     })
   );
 
+  await sleep(500);
+
+  const botInfo = await requestToSlack("/api/users.profile.get", "GET", {});
+
+  if (!botInfo.ok) {
+    throw new Error(`botInfo.ok is false: ${botInfo.error}`);
+  }
+
+  const botUserProfile = userProfiles.find(
+    (userProfile) => userProfile.bot_id === botInfo.profile.bot_id
+  );
+
   const userContentToAi = JSON.stringify({
-    lang: "ja",
-    userProfiles: userProfiles.map(({ user, display_name, real_name }) => ({
-      user_id: user,
-      display_name: display_name,
-      real_name: real_name,
-    })),
+    context: {
+      lang: "ja",
+      current_datetime: getPrettyJapanDatetimeString(new Date()),
+    },
+    bot_profile: {
+      user_id: botUserProfile.user,
+      display_name: botUserProfile.display_name,
+      real_name: botUserProfile.real_name,
+    },
+    user_profiles: userProfiles
+      .filter((userProfile) => userProfile.user !== botUserProfile.user)
+      .map(({ user, display_name, real_name }) => ({
+        user_id: user,
+        display_name: display_name,
+        real_name: real_name,
+      })),
     messages: Array.from(conversationsHistory.messages)
       .reverse()
-      .map(({ text, user }) => ({
-        text: Array.from(text).slice(0, 256).join(""),
+      .map(({ text, user, ts }) => ({
         user_id: user,
+        datetime: getPrettyJapanDatetimeString(new Date(parseFloat(ts * 1000))),
+        text: Array.from(text).slice(0, 1024).join(""),
       })),
   });
 
@@ -85,17 +125,46 @@ async function main() {
           role: "system",
           content: fs.readFileSync(`${__dirname}/systemPrompts.md`).toString(),
         },
-        { role: "user", content: userContentToAi },
+        { role: "system", content: userContentToAi },
       ],
       temperature: 0,
-      max_tokens: 256,
+      max_tokens: 1024,
+      frequency_penalty: 1,
     },
   });
 
   const aiResponseObj = JSON.parse(aiResponse.choices[0].message.content);
   if (!aiResponseObj.speak || aiResponseObj.text == null) {
+    console.log("No message to speak");
     return;
   }
+
+  const newConversationsHistory = await requestToSlack(
+    "/api/conversations.history",
+    "POST",
+    {
+      bodyObj: {
+        channel: SLACK_CHANNEL_ID,
+        limit: 1,
+      },
+    }
+  );
+
+  if (!newConversationsHistory.ok) {
+    throw new Error(
+      `newConversationsHistory.ok is false: ${newConversationsHistory.error}`
+    );
+  }
+
+  if (
+    newConversationsHistory.messages[0].ts !==
+    conversationsHistory.messages[0].ts
+  ) {
+    console.log("New message has been posted");
+    return;
+  }
+
+  await sleep(500);
 
   const chatPostMessage = await requestToSlack(
     "/api/chat.postMessage",
