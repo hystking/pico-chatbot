@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/bin/sh
+
+cd `dirname $0`
 
 while true
 do
