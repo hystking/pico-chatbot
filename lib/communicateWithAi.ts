@@ -12,7 +12,7 @@ type Message = {
 export async function communicateWithAi(initialMessages: Message[]) {
   const messages = Array.from(initialMessages);
   for (let i = 0; i < LOOP_MAX; i++) {
-    console.log({ messages });
+    console.log(JSON.stringify({ messages }, null, 2));
 
     const aiResponse = await requestToOpenAi("/v1/chat/completions", "POST", {
       bodyObj: {
@@ -81,7 +81,7 @@ export async function communicateWithAi(initialMessages: Message[]) {
       results.push(await executeCommand(command));
     }
 
-    console.log({ results });
+    console.log(JSON.stringify({ results }, null, 2));
 
     if (results.length == 1 && results[0].type === "chat") {
       // 喋ったあとは基本的に終了

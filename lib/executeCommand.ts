@@ -5,12 +5,22 @@ import { workspacePath } from "./workspacepath.ts";
 const SLACK_CHANNEL_ID = Deno.env.get("SLACK_CHANNEL_ID");
 const SETTINGS_MAX_SIZE = 1024;
 
-// deno-lint-ignore ban-types
-function setValueToJson(json: object, keys: string[], value: string) {
+function setValueToJson(
+  // deno-lint-ignore ban-types
+  json: object,
+  keys: string[],
+  value: string | null | undefined
+) {
+  if (keys.length === 0 || (keys.length === 1 && keys[0] === "")) {
+    Object.keys(json).forEach((key) => {
+      (json as Record<string, unknown>)[key] = undefined;
+    });
+    return;
+  }
   let target = json as Record<string, unknown>;
   for (const key of keys.slice(0, -1)) {
     const targetKeyValue = tryToGetValue(target, key);
-    if (typeof targetKeyValue !== "object") {
+    if (targetKeyValue != null && typeof targetKeyValue !== "object") {
       throw new Error("key is invalid");
     }
     if (targetKeyValue == null) {
@@ -56,21 +66,19 @@ export async function executeCommand(command: unknown) {
         }
       );
       if (!tryToGetValue(chatPostMessage, "ok")) {
-        throw new Error(
-          `chatPostMessage.ok is false: ${tryToGetValue(
-            chatPostMessage,
-            "error"
-          )?.toString()}`
-        );
+        return {
+          type: commandType,
+          error: tryToGetValue(chatPostMessage, "error"),
+        };
       }
       return { type: commandType, message: "success." };
     }
     case "setting.set": {
       const commandValue = tryToGetValue(command, "value");
-      if (typeof commandValue !== "string") {
+      if (typeof commandValue !== "string" && commandValue != null) {
         return {
           type: commandType,
-          error: "value is not a string",
+          error: "value is not a string or null",
         };
       }
       const commandKey = tryToGetValue(command, "key");
@@ -119,10 +127,10 @@ export async function executeCommand(command: unknown) {
     }
     case "memory.set": {
       const commandValue = tryToGetValue(command, "value");
-      if (typeof commandValue !== "string") {
+      if (typeof commandValue !== "string" && commandValue != null) {
         return {
           type: commandType,
-          error: "value is not a string",
+          error: "value is not a string or null",
         };
       }
       const commandKey = tryToGetValue(command, "key");
