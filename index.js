@@ -1,19 +1,14 @@
 const fs = require("fs");
 const { sleep } = require("./lib/sleep");
 const { requestToSlack } = require("./lib/requestToSlack");
-const { requestToOpenAi } = require("./lib/requestToOpenAi");
 const {
   getPrettyJapanDatetimeString,
 } = require("./lib/getPrettyJapanDatetimeString");
-
+const { communicateWithAi } = require("./lib/communicateWithAi");
+const getMemoryKeys = require("./lib/getMemoryKeys");
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 
 async function main() {
-  // create tmp directory if not exists
-  if (!fs.existsSync(`${__dirname}/tmp`)) {
-    fs.mkdirSync(`${__dirname}/tmp`);
-  }
-
   const conversationsHistory = await requestToSlack(
     "/api/conversations.history",
     "POST",
@@ -40,7 +35,7 @@ async function main() {
   let lastMessageTs = null;
   try {
     lastMessageTs = fs
-      .readFileSync(`${__dirname}/tmp/lastMessageTs.txt`)
+      .readFileSync(`${__dirname}/state/lastMessageTs.txt`)
       .toString();
   } catch (e) {
     console.log("No lastMessageTs.txt");
@@ -53,7 +48,7 @@ async function main() {
 
   // save the last message ts
   fs.writeFileSync(
-    `${__dirname}/tmp/lastMessageTs.txt`,
+    `${__dirname}/state/lastMessageTs.txt`,
     conversationsHistory.messages[0].ts
   );
 
@@ -106,20 +101,34 @@ async function main() {
     botProfileResponse.profile.display_name ||
     botProfileResponse.profile.real_name ||
     "Bot";
+
+  const settings = JSON.parse(
+    fs.readFileSync(`${__dirname}/state/settings.json`).toString()
+  );
+
+  const memories = JSON.parse(
+    fs.readFileSync(`${__dirname}/state/memories.json`).toString()
+  );
+
   const userContentToAi = JSON.stringify({
     context: {
-      lang: "ja",
       time: getPrettyJapanDatetimeString(new Date()),
     },
+    settings,
+    memoryKeys: getMemoryKeys(memories),
     chatbot: {
       ...(botUserId ? { user_id: botUserId } : {}),
       name: botName,
     },
-    users: userProfiles.map(({ user, display_name, real_name }) => ({
-      ...(user ? { user_id: user } : {}),
-      ...(real_name ? { name: real_name } : {}),
-      ...(display_name ? { name: display_name } : {}),
-    })),
+    users: Object.fromEntries(
+      userProfiles.map(({ user, display_name, real_name }) => [
+        user,
+        {
+          ...(real_name ? { name: real_name } : {}),
+          ...(display_name ? { name: display_name } : {}),
+        },
+      ])
+    ),
     messages: Array.from(conversationsHistory.messages)
       .reverse()
       .map(({ text, user, ts }) => ({
@@ -129,76 +138,13 @@ async function main() {
       })),
   });
 
-  console.log(userContentToAi);
-
-  const aiResponse = await requestToOpenAi("/v1/chat/completions", "POST", {
-    bodyObj: {
-      model: "gpt-4",
-      // model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: fs.readFileSync(`${__dirname}/systemPrompts.md`).toString(),
-        },
-        { role: "system", content: userContentToAi },
-      ],
-      temperature: 0,
-      max_tokens: 2048,
+  await communicateWithAi([
+    {
+      role: "system",
+      content: fs.readFileSync(`${__dirname}/systemPrompts.md`).toString(),
     },
-  });
-
-  if (aiResponse.error) {
-    throw new Error(
-      `aiResponse.ok is false: ${JSON.stringify(aiResponse.error)}`
-    );
-  }
-
-  const aiResponseObj = JSON.parse(aiResponse.choices[0].message.content);
-  console.log(aiResponseObj);
-  if (!aiResponseObj.speak || aiResponseObj.text == null) {
-    console.log("No message to speak");
-    return;
-  }
-
-  const newConversationsHistory = await requestToSlack(
-    "/api/conversations.history",
-    "POST",
-    {
-      bodyObj: {
-        channel: SLACK_CHANNEL_ID,
-        limit: 1,
-      },
-    }
-  );
-
-  if (!newConversationsHistory.ok) {
-    throw new Error(
-      `newConversationsHistory.ok is false: ${newConversationsHistory.error}`
-    );
-  }
-
-  if (
-    newConversationsHistory.messages[0].ts !==
-    conversationsHistory.messages[0].ts
-  ) {
-    console.log("New message has been posted");
-    return;
-  }
-
-  const chatPostMessage = await requestToSlack(
-    "/api/chat.postMessage",
-    "POST",
-    {
-      bodyObj: {
-        channel: SLACK_CHANNEL_ID,
-        text: aiResponseObj.text,
-      },
-    }
-  );
-
-  if (!chatPostMessage.ok) {
-    throw new Error(`chatPostMessage.ok is false: ${chatPostMessage.error}`);
-  }
+    { role: "user", content: userContentToAi },
+  ]);
 }
 
 main();
