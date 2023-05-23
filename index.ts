@@ -214,7 +214,11 @@ async function main() {
 
 async function index() {
   while (true) {
-    await main();
+    try {
+      await main();
+    } catch (error) {
+      console.error(error);
+    }
     await sleep(1000 * 10);
   }
 }
