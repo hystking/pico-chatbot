@@ -4,7 +4,12 @@ import { tryToGetValue } from "./tryToGetValue.ts";
 
 const LOOP_MAX = 5;
 
-export async function communicateWithAi(initialMessages: OpenAiChatMessage[]) {
+type Message = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+export async function communicateWithAi(initialMessages: Message[]) {
   const messages = Array.from(initialMessages);
   for (let i = 0; i < LOOP_MAX; i++) {
     console.log({ messages });
