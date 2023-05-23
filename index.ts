@@ -1,18 +1,10 @@
-// const { sleep } = require("./lib/sleep");
-// const { requestToSlack } = require("./lib/requestToSlack");
-// const {
-//   getPrettyJapanDatetimeString,
-// } = require("./lib/getPrettyJapanDatetimeString");
-// const { communicateWithAi } = require("./lib/communicateWithAi");
-// const getMemoryKeys = require("./lib/getMemoryKeys");
-
 import { sleep } from "./lib/sleep.ts";
 import { requestToSlack } from "./lib/requestToSlack.ts";
 import { getPrettyJapanDatetimeString } from "./lib/getPrettyJapanDatetimeString.ts";
 import { communicateWithAi } from "./lib/communicateWithAi.ts";
-import { getMemoryKeys } from "./lib/getMemoryKeys.ts";
 import { workspacePath } from "./lib/workspacepath.ts";
 import { tryToGetValue } from "./lib/tryToGetValue.ts";
+import { traverse } from "./lib/traverse.ts";
 
 const SLACK_CHANNEL_ID = Deno.env.get("SLACK_CHANNEL_ID");
 
@@ -166,12 +158,17 @@ async function main() {
     throw new Error(`memories is not an object: ${memories?.toString()}`);
   }
 
+  const memoryKeys: string[] = [];
+  traverse(memories, (path) => {
+    memoryKeys.push(path.join("."));
+  });
+
   const userContentToAi = JSON.stringify({
     context: {
       time: getPrettyJapanDatetimeString(new Date()),
     },
     settings,
-    memoryKeys: getMemoryKeys(memories),
+    memoryKeys,
     chatbot: {
       ...(botUserId ? { user_id: botUserId } : {}),
       name: botName,
@@ -216,7 +213,7 @@ async function main() {
 }
 
 async function index() {
-  while(true) {
+  while (true) {
     await main();
     await sleep(1000 * 10);
   }
