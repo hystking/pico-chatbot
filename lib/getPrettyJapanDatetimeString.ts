@@ -1,4 +1,4 @@
-function getPrettyJapanDatetimeString(date) {
+export function getPrettyJapanDatetimeString(date: Date) {
   // cancel timezone offset
   const utcDate = new Date(
     date.getTime() + date.getTimezoneOffset() * 60 * 1000
@@ -13,5 +13,3 @@ function getPrettyJapanDatetimeString(date) {
   const secondStr = `0${japanDate.getSeconds()}`.slice(-2);
   return `${year}/${month}/${day} ${hourStr}:${minuteStr}:${secondStr}`;
 }
-
-module.exports = { getPrettyJapanDatetimeString };

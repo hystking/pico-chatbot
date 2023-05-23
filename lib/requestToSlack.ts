@@ -1,8 +1,14 @@
-const { request } = require("./request");
+const SLACK_APP_OAUTH_TOKEN = Deno.env.get("SLACK_APP_OAUTH_TOKEN");
 
-const SLACK_APP_OAUTH_TOKEN = process.env.SLACK_APP_OAUTH_TOKEN;
-
-async function requestToSlack(path, method, { bodyObj, searchParams }) {
+export function requestToSlack(
+  pathname: string,
+  method: string,
+  {
+    bodyObj,
+    searchParams,
+  }: // deno-lint-ignore ban-types
+  { bodyObj?: object; searchParams?: URLSearchParams }
+) {
   if (bodyObj != null && typeof bodyObj !== "object") {
     throw new Error("bodyObj must be an object");
   }
@@ -17,19 +23,16 @@ async function requestToSlack(path, method, { bodyObj, searchParams }) {
       : method.toUpperCase() === "POST"
       ? {
           "Content-Type": "application/json; charset=utf-8",
-          "Content-Length": Buffer.byteLength(bodyString),
           Authorization: `Bearer ${SLACK_APP_OAUTH_TOKEN}`,
         }
-      : null;
+      : undefined;
 
-  const options = {
-    hostname: "slack.com",
-    path: searchParams == null ? path : `${path}?${searchParams.toString()}`,
+  const path =
+    searchParams == null ? pathname : `${pathname}?${searchParams.toString()}`;
+
+  return fetch(`https://slack.com/${path.replace(/^\/+/, "")}`, {
     method,
     headers,
-  };
-
-  return request(options, bodyString);
+    body: bodyString,
+  }).then((res) => res.json());
 }
-
-module.exports = { requestToSlack };

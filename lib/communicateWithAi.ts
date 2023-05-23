@@ -1,9 +1,10 @@
-const { exectuteCommand } = require("./executeCommand");
-const { requestToOpenAi } = require("./requestToOpenAi");
+import { executeCommand } from "./executeCommand.ts";
+import { requestToOpenAi } from "./requestToOpenAi.ts";
+import { tryToGetValue } from "./tryToGetValue.ts";
 
 const LOOP_MAX = 5;
 
-async function communicateWithAi(initialMessages) {
+export async function communicateWithAi(initialMessages: OpenAiChatMessage[]) {
   const messages = Array.from(initialMessages);
   for (let i = 0; i < LOOP_MAX; i++) {
     console.log({ messages });
@@ -19,15 +20,24 @@ async function communicateWithAi(initialMessages) {
       },
     });
 
-    if (aiResponse.error) {
-      throw new Error(
-        `aiResponse.ok is false: ${JSON.stringify(aiResponse.error)}`
-      );
+    const error = tryToGetValue(aiResponse, "error");
+    if (error != null) {
+      throw new Error(`aiResponse.ok is false: ${JSON.stringify(error)}`);
     }
 
-    const { content } = aiResponse.choices[0].message;
+    const aiResponseChoices = tryToGetValue(aiResponse, "choices");
 
-    console.log({ content });
+    if (!Array.isArray(aiResponseChoices)) {
+      throw new Error(`aiResponse.choices is not array`);
+    }
+
+    const firstAiResponseChoices = aiResponseChoices[0];
+
+    const content = tryToGetValue(firstAiResponseChoices, "message", "content");
+
+    if (typeof content !== "string") {
+      throw new Error(`content is not string`);
+    }
 
     let aiResponseObj;
     try {
@@ -37,17 +47,18 @@ async function communicateWithAi(initialMessages) {
 
       messages.push({
         role: "user",
-        content: {
+        content: JSON.stringify({
           error: "JSON.parse failed",
-        },
+        }),
       });
     }
 
-    if (!aiResponseObj.commands) {
+    const commands = tryToGetValue(aiResponseObj, "commands");
+    if (commands == null) {
       throw new Error(`aiResponseObj.commands is undefined`);
     }
 
-    if (aiResponseObj.commands.length == null) {
+    if (!Array.isArray(commands)) {
       throw new Error(`aiResponseObj.commands.length is undefined`);
     }
 
@@ -56,13 +67,13 @@ async function communicateWithAi(initialMessages) {
       content,
     });
 
-    if (aiResponseObj.commands.length == 0) {
+    if (commands.length == 0) {
       return;
     }
 
     const results = [];
-    for (const command of aiResponseObj.commands) {
-      results.push(await exectuteCommand(command));
+    for (const command of commands) {
+      results.push(await executeCommand(command));
     }
 
     console.log({ results });
@@ -78,5 +89,3 @@ async function communicateWithAi(initialMessages) {
     });
   }
 }
-
-module.exports = { communicateWithAi };

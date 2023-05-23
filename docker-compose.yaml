@@ -1,7 +1,10 @@
 version: '3'
 services:
   chatbot:
-    image: 'node:20-alpine'
+    image: 'denoland/deno:ubuntu-1.33.4'
     volumes:
       - .:/app
-    command: [ 'sh', '/app/run.sh' ]
+    working_dir: /app
+    env_file:
+      - .env
+    command: 'deno run --allow-env --allow-net --allow-read --allow-write index.ts'
