@@ -50,7 +50,7 @@ async function main() {
     lastMessageTs = await Deno.readTextFile(
       `${workspacePath}/state/lastMessageTs.txt`
     );
-  } catch (e) {
+  } catch (_) {
     console.log("No lastMessageTs.txt");
   }
 
