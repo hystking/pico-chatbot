@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./fetchWithTimeout.ts";
+
 const SLACK_APP_OAUTH_TOKEN = Deno.env.get("SLACK_APP_OAUTH_TOKEN");
 
 export function requestToSlack(
@@ -30,9 +32,13 @@ export function requestToSlack(
   const path =
     searchParams == null ? pathname : `${pathname}?${searchParams.toString()}`;
 
-  return fetch(`https://slack.com/${path.replace(/^\/+/, "")}`, {
-    method,
-    headers,
-    body: bodyString,
-  }).then((res) => res.json());
+  return fetchWithTimeout(
+    `https://slack.com/${path.replace(/^\/+/, "")}`,
+    {
+      method,
+      headers,
+      body: bodyString,
+    },
+    1000 * 30
+  ).then((res) => res.json());
 }

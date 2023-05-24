@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./fetchWithTimeout.ts";
+
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 export function requestToOpenAi(
@@ -14,9 +16,13 @@ export function requestToOpenAi(
     "Content-Type": "application/json",
     Authorization: `Bearer ${OPENAI_API_KEY}`,
   };
-  return fetch(`https://api.openai.com/${pathname.replace(/^\/+/, "")}`, {
-    method,
-    headers,
-    body: bodyString,
-  }).then((res) => res.json());
+  return fetchWithTimeout(
+    `https://api.openai.com/${pathname.replace(/^\/+/, "")}`,
+    {
+      method,
+      headers,
+      body: bodyString,
+    },
+    1000 * 30
+  ).then((res) => res.json());
 }
