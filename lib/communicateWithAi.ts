@@ -1,5 +1,6 @@
 import { executeCommand } from "./executeCommand.ts";
 import { requestToOpenAi } from "./requestToOpenAi.ts";
+import { sleep } from "./sleep.ts";
 import { tryToGetValue } from "./tryToGetValue.ts";
 
 const LOOP_MAX = 5;
@@ -67,14 +68,11 @@ export async function communicateWithAi(initialMessages: Message[]) {
       throw new Error(`aiResponseObj.commands is not array`);
     }
 
-    messages.push({
-      role: "assistant",
-      content,
-    });
-
     if (commands.length == 0) {
       return;
     }
+
+    console.log(JSON.stringify({ commands }, null, 2));
 
     const results = [];
     for (const command of commands) {
@@ -87,10 +85,16 @@ export async function communicateWithAi(initialMessages: Message[]) {
       // 喋ったあとは基本的に終了
       return;
     }
-
+  
+    messages.push({
+      role: "assistant",
+      content,
+    });
     messages.push({
       role: "user",
       content: JSON.stringify({ results }),
     });
+
+    await sleep(500);
   }
 }

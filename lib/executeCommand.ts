@@ -1,3 +1,5 @@
+import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts";
+import { fetchWithTimeout } from "./fetchWithTimeout.ts";
 import { requestToSlack } from "./requestToSlack.ts";
 import { tryToGetValue } from "./tryToGetValue.ts";
 import { workspacePath } from "./workspacepath.ts";
@@ -37,6 +39,14 @@ function setValueToJson(
   } else {
     target[lastKey] = value;
   }
+}
+
+function cleanUpText(text: string) {
+  return text
+    .split("\n")
+    .map((line) => line.replaceAll("\s+", " ").trim())
+    .filter((line) => line !== "")
+    .join("\n");
 }
 
 export async function executeCommand(command: unknown) {
@@ -206,6 +216,62 @@ export async function executeCommand(command: unknown) {
         }
         const result = eval(commandExpression);
         return { type: commandType, success: result.toString() };
+      } catch (e) {
+        return { type: commandType, error: e.message };
+      }
+    }
+    case "url.get": {
+      try {
+        const commandUrl = tryToGetValue(command, "url");
+        if (typeof commandUrl !== "string") {
+          return {
+            type: commandType,
+            error: "url is not a string",
+          };
+        }
+        const response = await fetchWithTimeout(commandUrl, {}, 1000 * 30);
+        if (!response.ok) {
+          return {
+            type: commandType,
+            error: `response is not ok: ${response.status}`,
+          };
+        }
+        const document = new DOMParser().parseFromString(
+          await response.text(),
+          "text/html"
+        );
+
+        if (document == null) {
+          return {
+            type: commandType,
+            error: "failed to parse html",
+          };
+        }
+
+        const title = cleanUpText(
+          document.querySelector("title")?.textContent ?? ""
+        );
+        const description = cleanUpText(
+          document.querySelector("meta[name=description]")?.textContent ?? ""
+        );
+
+        const elements: { tag: string; text: string }[] = [];
+        document.querySelectorAll("h1, h2, h3, p")?.forEach((element) => {
+          elements.push({
+            tag: element.nodeName.toLowerCase(),
+            text: Array.from(cleanUpText(element.textContent))
+              .splice(0, 128)
+              .join(""),
+          });
+        });
+        return {
+          type: commandType,
+          success: {
+            title,
+            description,
+            elements,
+          },
+        };
       } catch (e) {
         return { type: commandType, error: e.message };
       }
