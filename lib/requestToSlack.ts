@@ -11,6 +11,11 @@ export function requestToSlack(
   }: // deno-lint-ignore ban-types
   { bodyObj?: object; searchParams?: URLSearchParams }
 ) {
+  console.log({
+    function: "requestToSlack",
+    pathname,
+    method,
+  });
   if (bodyObj != null && typeof bodyObj !== "object") {
     throw new Error("bodyObj must be an object");
   }

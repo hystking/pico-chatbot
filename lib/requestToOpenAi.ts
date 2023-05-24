@@ -7,6 +7,12 @@ export function requestToOpenAi(
   method: string,
   { bodyObj }: { bodyObj: Record<string, unknown> }
 ) {
+  console.log({
+    function: "requestToOpenAi",
+    pathname,
+    method,
+  });
+
   if (bodyObj != null && typeof bodyObj !== "object") {
     throw new Error("bodyObj must be an object");
   }
@@ -23,6 +29,6 @@ export function requestToOpenAi(
       headers,
       body: bodyString,
     },
-    1000 * 30
+    1000 * 180
   ).then((res) => res.json());
 }

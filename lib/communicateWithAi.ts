@@ -48,7 +48,7 @@ export async function communicateWithAi(initialMessages: Message[]) {
     try {
       aiResponseObj = JSON.parse(content);
     } catch (e) {
-      console.log({ e });
+      console.log({ e, content });
 
       messages.push({
         role: "user",
@@ -64,7 +64,7 @@ export async function communicateWithAi(initialMessages: Message[]) {
     }
 
     if (!Array.isArray(commands)) {
-      throw new Error(`aiResponseObj.commands.length is undefined`);
+      throw new Error(`aiResponseObj.commands is not array`);
     }
 
     messages.push({
