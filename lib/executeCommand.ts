@@ -44,7 +44,7 @@ function setValueToJson(
 function cleanUpText(text: string) {
   return text
     .split("\n")
-    .map((line) => line.replaceAll("\s+", " ").trim())
+    .map((line) => line.replaceAll("s+", " ").trim())
     .filter((line) => line !== "")
     .join("\n");
 }
@@ -206,14 +206,14 @@ export async function executeCommand(command: unknown) {
       };
     }
     case "math": {
+      const commandExpression = tryToGetValue(command, "expression");
+      if (typeof commandExpression !== "string") {
+        return {
+          type: commandType,
+          error: "expression is not a string",
+        };
+      }
       try {
-        const commandExpression = tryToGetValue(command, "expression");
-        if (typeof commandExpression !== "string") {
-          return {
-            type: commandType,
-            error: "expression is not a string",
-          };
-        }
         const result = eval(commandExpression);
         return { type: commandType, success: result.toString() };
       } catch (e) {
@@ -221,60 +221,56 @@ export async function executeCommand(command: unknown) {
       }
     }
     case "url.get": {
-      try {
-        const commandUrl = tryToGetValue(command, "url");
-        if (typeof commandUrl !== "string") {
-          return {
-            type: commandType,
-            error: "url is not a string",
-          };
-        }
-        const response = await fetchWithTimeout(commandUrl, {}, 1000 * 30);
-        if (!response.ok) {
-          return {
-            type: commandType,
-            error: `response is not ok: ${response.status}`,
-          };
-        }
-        const document = new DOMParser().parseFromString(
-          await response.text(),
-          "text/html"
-        );
-
-        if (document == null) {
-          return {
-            type: commandType,
-            error: "failed to parse html",
-          };
-        }
-
-        const title = cleanUpText(
-          document.querySelector("title")?.textContent ?? ""
-        );
-        const description = cleanUpText(
-          document.querySelector("meta[name=description]")?.textContent ?? ""
-        );
-
-        const elements: { tag: string; text: string }[] = [];
-        document.querySelectorAll("h1, h2, h3, p")?.forEach((element) => {
-          elements.push({
-            tag: element.nodeName.toLowerCase(),
-            text: Array.from(cleanUpText(element.textContent))
-              .splice(0, 128)
-              .join(""),
-          });
-        });
+      const commandUrl = tryToGetValue(command, "url");
+      if (typeof commandUrl !== "string") {
         return {
           type: commandType,
-          success: {
-            title,
-            description,
-            elements,
-          },
+          error: "url is not a string",
         };
-      } catch (e) {
-        return { type: commandType, error: e.message };
       }
+      const response = await fetchWithTimeout(commandUrl, {}, 1000 * 30);
+      if (!response.ok) {
+        return {
+          type: commandType,
+          error: `response is not ok: ${response.status}`,
+        };
+      }
+      const document = new DOMParser().parseFromString(
+        await response.text(),
+        "text/html"
+      );
+
+      if (document == null) {
+        return {
+          type: commandType,
+          error: "failed to parse html",
+        };
+      }
+
+      const title = cleanUpText(
+        document.querySelector("title")?.textContent ?? ""
+      );
+      const description = cleanUpText(
+        document.querySelector("meta[name=description]")?.textContent ?? ""
+      );
+
+      const elements: { tag: string; text: string }[] = [];
+      document.querySelectorAll("h1, h2, h3, p")?.forEach((element) => {
+        elements.push({
+          tag: element.nodeName.toLowerCase(),
+          text: Array.from(cleanUpText(element.textContent))
+            .splice(0, 128)
+            .join(""),
+        });
+      });
+      return {
+        type: commandType,
+        success: {
+          title,
+          description,
+          elements,
+        },
+      };
     }
   }
   return {
