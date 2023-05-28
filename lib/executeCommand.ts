@@ -2,24 +2,23 @@ import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts";
 import { fetchWithTimeout } from "./fetchWithTimeout.ts";
 import { requestToSlack } from "./requestToSlack.ts";
 import { tryToGetValue } from "./tryToGetValue.ts";
-import { workspacePath } from "./workspacepath.ts";
 
 const SLACK_CHANNEL_ID = Deno.env.get("SLACK_CHANNEL_ID");
 const SETTINGS_MAX_SIZE = 1024;
 
-function setValueToJson(
+function setValueToObject(
   // deno-lint-ignore ban-types
-  json: object,
+  obj: object,
   keys: string[],
   value: string | null | undefined
 ) {
   if (keys.length === 0 || (keys.length === 1 && keys[0] === "")) {
-    Object.keys(json).forEach((key) => {
-      (json as Record<string, unknown>)[key] = undefined;
+    Object.keys(obj).forEach((key) => {
+      (obj as Record<string, unknown>)[key] = undefined;
     });
     return;
   }
-  let target = json as Record<string, unknown>;
+  let target = obj as Record<string, unknown>;
   for (const key of keys.slice(0, -1)) {
     const targetKeyValue = tryToGetValue(target, key);
     if (targetKeyValue != null && typeof targetKeyValue !== "object") {
@@ -49,7 +48,13 @@ function cleanUpText(text: string) {
     .join("\n");
 }
 
-export async function executeCommand(command: unknown) {
+export async function executeCommand({
+  command,
+  settings,
+}: {
+  command: unknown;
+  settings: object;
+}) {
   const commandType = tryToGetValue(command, "type");
   if (typeof commandType !== "string") {
     return {
@@ -98,114 +103,30 @@ export async function executeCommand(command: unknown) {
           error: "key is not a string",
         };
       }
-      const settings = await Deno.readTextFile(
-        `${workspacePath}/state/settings.json`
-      );
-      const settingsObj = JSON.parse(settings);
-      if (typeof settingsObj !== "object" || settingsObj == null) {
-        return {
-          type: commandType,
-          error: "settings is not an object",
-        };
-      }
       const keys = commandKey.split(".");
+
       // keys の先頭が settings の場合は消す
       if (keys[0] === "settings") {
         keys.shift();
       }
 
       try {
-        setValueToJson(settingsObj, keys, commandValue);
+        setValueToObject(settings, keys, commandValue);
       } catch (e) {
         return {
           type: commandType,
           error: e.toString(),
         };
       }
-      const writeResult = JSON.stringify(settingsObj);
+      const writeResult = JSON.stringify(settings);
       if (SETTINGS_MAX_SIZE < writeResult.length) {
         return {
           type: commandType,
           error: `settings is too large: ${writeResult.length}. max is ${SETTINGS_MAX_SIZE}`,
         };
       }
-      await Deno.writeTextFile(
-        `${workspacePath}/state/settings.json`,
-        JSON.stringify(settingsObj)
-      );
+
       return { type: commandType, success: `${commandKey} is set.` };
-    }
-    case "memory.set": {
-      const commandValue = tryToGetValue(command, "value");
-      if (typeof commandValue !== "string" && commandValue != null) {
-        return {
-          type: commandType,
-          error: "value is not a string or null",
-        };
-      }
-      const commandKey = tryToGetValue(command, "key");
-      if (typeof commandKey !== "string") {
-        return {
-          type: commandType,
-          error: "key is not a string",
-        };
-      }
-      const memory = await Deno.readTextFile(
-        `${workspacePath}/state/memory.json`
-      );
-      const memoryObj = JSON.parse(memory);
-
-      if (typeof memoryObj !== "object" || memoryObj == null) {
-        return {
-          type: commandType,
-          error: "memory is not an object",
-        };
-      }
-
-      const keys = commandKey.split(".");
-
-      try {
-        setValueToJson(memoryObj, keys, commandValue);
-      } catch (e) {
-        return {
-          type: commandType,
-          error: e.toString(),
-        };
-      }
-
-      await Deno.writeTextFile(
-        `${workspacePath}/state/memory.json`,
-        JSON.stringify(memoryObj)
-      );
-      return { type: commandType, success: `${commandKey} is set.` };
-    }
-    case "memory.read": {
-      const commandKey = tryToGetValue(command, "key");
-      if (typeof commandKey !== "string") {
-        return {
-          type: commandType,
-          error: "key is not a string",
-        };
-      }
-      const memory = await Deno.readTextFile(
-        `${workspacePath}/state/memory.json`
-      );
-      const value = tryToGetValue(
-        JSON.parse(memory),
-        ...commandKey.split(".")
-      );
-      if (value == null) {
-        return {
-          type: commandType,
-          error: `${commandKey} is not found.`,
-        };
-      }
-
-      const valueInString = typeof value === "object" ? JSON.stringify(value) : value.toString();
-      return {
-        type: commandType,
-        success: `${commandKey} is ${valueInString}.`,
-      };
     }
     case "math": {
       const commandExpression = tryToGetValue(command, "expression");

@@ -2,9 +2,8 @@ import { sleep } from "./lib/sleep.ts";
 import { requestToSlack } from "./lib/requestToSlack.ts";
 import { getPrettyJapanDatetimeString } from "./lib/getPrettyJapanDatetimeString.ts";
 import { communicateWithAi } from "./lib/communicateWithAi.ts";
-import { workspacePath } from "./lib/workspacepath.ts";
+import { workspacePath } from "./lib/workspacePath.ts";
 import { tryToGetValue } from "./lib/tryToGetValue.ts";
-import { traverse } from "./lib/traverse.ts";
 
 const SLACK_CHANNEL_ID = Deno.env.get("SLACK_CHANNEL_ID");
 
@@ -145,6 +144,7 @@ async function main() {
       };
     })
   );
+
   const botName =
     tryToGetValue(botProfileResponse, "profile", "display_name") ||
     tryToGetValue(botProfileResponse, "profile", "real_name") ||
@@ -162,19 +162,6 @@ async function main() {
     throw new Error(`settings is not an object: ${settings?.toString()}`);
   }
 
-  const memory = JSON.parse(
-    await Deno.readTextFile(`${workspacePath}/state/memory.json`)
-  );
-
-  if (typeof memory !== "object" || memory == null) {
-    throw new Error(`memory is not an object: ${memory?.toString()}`);
-  }
-
-  const memoryKeys: string[] = [];
-  traverse(memory, (path) => {
-    memoryKeys.push(path.join("."));
-  });
-
   await communicateWithAi({
     context: {
       time: getPrettyJapanDatetimeString(new Date()),
@@ -184,7 +171,6 @@ async function main() {
       name: botName,
     },
     settings,
-    memory,
     users: Object.fromEntries(
       userProfiles.map(({ user, display_name, real_name }) => [
         user,
@@ -218,6 +204,11 @@ async function main() {
         };
       }),
   });
+
+  await Deno.writeTextFile(
+    `${workspacePath}/state/settings.json`,
+    JSON.stringify(settings, null, 2)
+  );
 }
 
 async function index() {

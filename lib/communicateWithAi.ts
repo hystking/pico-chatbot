@@ -1,7 +1,6 @@
 import { executeCommand } from "./executeCommand.ts";
 import { requestToOpenAi } from "./requestToOpenAi.ts";
 import { sleep } from "./sleep.ts";
-import { traverse } from "./traverse.ts";
 import { tryToGetValue } from "./tryToGetValue.ts";
 
 const LOOP_MAX = 5;
@@ -12,76 +11,14 @@ export async function communicateWithAi({
   users,
   chatMessages,
   settings,
-  memory,
 }: {
   context: ChatContext;
   chatbot: Chatbot;
   users: Record<string, User>;
   chatMessages: ChatMessage[];
+  // deno-lint-ignore ban-types
   settings: object;
-  memory: object;
 }) {
-  // まずは会話を例示して、タイムラインを要約させる
-
-  // const {
-  //   summaryContent,
-  //   responseNeededContent,
-  //   responseNeeded,
-  //   responseNeededBecause,
-  // } = await summarizeChatContext({
-  //   context,
-  //   chatbot,
-  //   users,
-  //   chatMessages,
-  //   settings,
-  // });
-
-  // console.log({
-  //   summaryContent,
-  //   responseNeededContent,
-  //   responseNeededBecause,
-  //   responseNeeded,
-  // });
-
-  // if (responseNeeded === false) {
-  //   return;
-  // }
-
-  // await sleep(500);
-
-  // const {
-  //   content: someOneNeedsHelpContent,
-  //   isYes: someOneNeedsHelp,
-  // } = await askSomeOneNeedsHelp({
-  //   messages: summarizeMessage,
-  //   chatContextSummary,
-  // });
-
-  // console.log({
-  //   someOneNeedsHelpContent,
-  //   someOneNeedsHelp,
-  // })
-
-  // await sleep(500);
-
-  // const {
-  //   content: isThereSomethingToSayContent,
-  //   isYes: isThereSomethingToSay,
-  // } = await askIsThereSomethingToSay({
-  //   messages: summarizeMessage,
-  //   chatContextSummary,
-  // });
-
-  // console.log({
-  //   isThereSomethingToSayContent,
-  //   isThereSomethingToSay,
-  // })
-
-  const chatbotMemoryKeys: string[] = [];
-  traverse(memory, (path) => {
-    chatbotMemoryKeys.push(path.join("."));
-  });
-
   const messages = Array.from([
     {
       role: "system",
@@ -174,26 +111,8 @@ export async function communicateWithAi({
         },
       }),
     },
-    //     {
-    //       role: "system",
-    //       content: `${summaryContent}
-    // You should take an action, ${responseNeededBecause}
-
-    // Your response should be a JSON format below.
-
-    // \`\`\`typescript
-    // type Command={type:"chat";text:string}|{type:"setting.set";key:string;value:string}|{type:"memory.set";key:string;value:string}|{type:"memory.read";key:string}|{type:"math";expression:string}|{type:"url.get";url:string};type Response={commands:Command[]};
-    // \`\`\`
-
-    // "commands" will execute in order. "key" can be a path to a nested object, such as "key1.key2.key3". To delete a value, set value to null. The commands will be executed and the result will be returned. You can use "<@user_id>" to mention the user in a chat text. Send the next commands according to the result. if you have nothing to do, you can wait for the next input by returning an empty commands. The response should be minified.
-
-    // Your current settings and memory keys are as follows.
-
-    // Chatbot settings: ${JSON.stringify(settings)}
-    // Chatbot Memory keys: ${JSON.stringify(chatbotMemoryKeys)}
-    // `,
-    //     },
   ]);
+
   for (let i = 0; i < LOOP_MAX; i++) {
     console.log(JSON.stringify({ messages }, null, 2));
 
@@ -260,7 +179,7 @@ export async function communicateWithAi({
 
     const results = [];
     for (const command of commands) {
-      results.push(await executeCommand(command));
+      results.push(await executeCommand({ command, settings }));
     }
 
     console.log(JSON.stringify({ results }, null, 2));
@@ -274,6 +193,7 @@ export async function communicateWithAi({
       role: "assistant",
       content,
     });
+
     messages.push({
       role: "user",
       content: JSON.stringify({
@@ -291,5 +211,9 @@ export async function communicateWithAi({
     });
 
     await sleep(500);
+  }
+
+  return {
+    settings,
   }
 }
