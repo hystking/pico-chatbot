@@ -108,6 +108,10 @@ async function main() {
     "user"
   );
 
+  if (typeof botUserId !== "string") {
+    throw new Error(`botUserId is not a string: ${botUserId?.toString()}`);
+  }
+
   const uniqueUsers = conversationsHistoryMessages
     .filter(
       (message) =>
@@ -144,35 +148,43 @@ async function main() {
   const botName =
     tryToGetValue(botProfileResponse, "profile", "display_name") ||
     tryToGetValue(botProfileResponse, "profile", "real_name") ||
-    "Bot";
+    "Chatbot";
+
+  if (typeof botName !== "string") {
+    throw new Error(`botName is not a string: ${botName?.toString()}`);
+  }
 
   const settings = JSON.parse(
     await Deno.readTextFile(`${workspacePath}/state/settings.json`)
   );
 
-  const memories = JSON.parse(
-    await Deno.readTextFile(`${workspacePath}/state/memories.json`)
+  if (typeof settings !== "object" || settings == null) {
+    throw new Error(`settings is not an object: ${settings?.toString()}`);
+  }
+
+  const memory = JSON.parse(
+    await Deno.readTextFile(`${workspacePath}/state/memory.json`)
   );
 
-  if (typeof memories !== "object" || memories == null) {
-    throw new Error(`memories is not an object: ${memories?.toString()}`);
+  if (typeof memory !== "object" || memory == null) {
+    throw new Error(`memory is not an object: ${memory?.toString()}`);
   }
 
   const memoryKeys: string[] = [];
-  traverse(memories, (path) => {
+  traverse(memory, (path) => {
     memoryKeys.push(path.join("."));
   });
 
-  const userContentToAi = JSON.stringify({
+  await communicateWithAi({
     context: {
       time: getPrettyJapanDatetimeString(new Date()),
     },
-    settings,
-    memoryKeys,
     chatbot: {
-      ...(botUserId ? { user_id: botUserId } : {}),
+      userId: botUserId,
       name: botName,
     },
+    settings,
+    memory,
     users: Object.fromEntries(
       userProfiles.map(({ user, display_name, real_name }) => [
         user,
@@ -182,7 +194,7 @@ async function main() {
         },
       ])
     ),
-    messages: Array.from(conversationsHistoryMessages)
+    chatMessages: Array.from(conversationsHistoryMessages)
       .reverse()
       .map((message) => {
         const ts = tryToGetValue(message, "ts");
@@ -193,8 +205,12 @@ async function main() {
         if (typeof text !== "string") {
           throw new Error(`text is not a string: ${text?.toString()}`);
         }
+        const userId = tryToGetValue(message, "user") || undefined;
+        if (typeof userId !== "string") {
+          throw new Error(`userId is not a string: ${userId?.toString()}`);
+        }
         return {
-          user_id: tryToGetValue(message, "user"),
+          userId,
           time: getPrettyJapanDatetimeString(
             new Date(parseFloat(ts.toString()) * 1000)
           ),
@@ -202,25 +218,17 @@ async function main() {
         };
       }),
   });
-
-  await communicateWithAi([
-    {
-      role: "system",
-      content: await Deno.readTextFile(`${workspacePath}/systemPrompts.md`),
-    },
-    { role: "user", content: userContentToAi },
-  ]);
 }
 
 async function index() {
-  while (true) {
+  do {
     try {
       await main();
     } catch (error) {
       console.error(error);
     }
     await sleep(1000 * 10);
-  }
+  } while (true);
 }
 
 index();

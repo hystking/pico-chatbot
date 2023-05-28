@@ -1,17 +1,199 @@
 import { executeCommand } from "./executeCommand.ts";
 import { requestToOpenAi } from "./requestToOpenAi.ts";
 import { sleep } from "./sleep.ts";
+import { traverse } from "./traverse.ts";
 import { tryToGetValue } from "./tryToGetValue.ts";
 
 const LOOP_MAX = 5;
 
-type Message = {
-  role: "user" | "assistant" | "system";
-  content: string;
-};
+export async function communicateWithAi({
+  context,
+  chatbot,
+  users,
+  chatMessages,
+  settings,
+  memory,
+}: {
+  context: ChatContext;
+  chatbot: Chatbot;
+  users: Record<string, User>;
+  chatMessages: ChatMessage[];
+  settings: object;
+  memory: object;
+}) {
+  // まずは会話を例示して、タイムラインを要約させる
 
-export async function communicateWithAi(initialMessages: Message[]) {
-  const messages = Array.from(initialMessages);
+  // const {
+  //   summaryContent,
+  //   responseNeededContent,
+  //   responseNeeded,
+  //   responseNeededBecause,
+  // } = await summarizeChatContext({
+  //   context,
+  //   chatbot,
+  //   users,
+  //   chatMessages,
+  //   settings,
+  // });
+
+  // console.log({
+  //   summaryContent,
+  //   responseNeededContent,
+  //   responseNeededBecause,
+  //   responseNeeded,
+  // });
+
+  // if (responseNeeded === false) {
+  //   return;
+  // }
+
+  // await sleep(500);
+
+  // const {
+  //   content: someOneNeedsHelpContent,
+  //   isYes: someOneNeedsHelp,
+  // } = await askSomeOneNeedsHelp({
+  //   messages: summarizeMessage,
+  //   chatContextSummary,
+  // });
+
+  // console.log({
+  //   someOneNeedsHelpContent,
+  //   someOneNeedsHelp,
+  // })
+
+  // await sleep(500);
+
+  // const {
+  //   content: isThereSomethingToSayContent,
+  //   isYes: isThereSomethingToSay,
+  // } = await askIsThereSomethingToSay({
+  //   messages: summarizeMessage,
+  //   chatContextSummary,
+  // });
+
+  // console.log({
+  //   isThereSomethingToSayContent,
+  //   isThereSomethingToSay,
+  // })
+
+  const chatbotMemoryKeys: string[] = [];
+  traverse(memory, (path) => {
+    chatbotMemoryKeys.push(path.join("."));
+  });
+
+  const messages = Array.from([
+    {
+      role: "system",
+      content:
+        'You are a chatbot agent. The input is provided in JSON format, where "task" is your task. Output your response as a JSON following the "responseSchema" format. The response should be minified.',
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        task: 'An illustration of your participation in the chat scenario is represented in "conversation". Begin by succinctly describing the flow of the conversation. Next, within the conversation, is there anyone who needs your help? Or, regardless of that, are you likely to do something next? Respond while respecting the settings. Then, if you need something to do, provide commands to acomplish the task.',
+        conversation: {
+          context,
+          chatbot,
+          users,
+          chatMessages,
+        },
+        settings,
+        responseSchema: {
+          type: "object",
+          properties: {
+            summary: {
+              type: "string",
+            },
+            responseNeeded: {
+              type: "boolean",
+            },
+            responseNeededBecause: {
+              type: "string",
+            },
+            commands: {
+              type: "array",
+              items: {
+                type: "object",
+                anyOf: [
+                  {
+                    properties: {
+                      type: {
+                        type: "string",
+                        const: "chat",
+                      },
+                      text: {
+                        type: "string",
+                      },
+                    },
+                  },
+                  {
+                    properties: {
+                      type: {
+                        type: "string",
+                        const: "setting.set",
+                      },
+                      key: {
+                        type: "string",
+                        descripntion:
+                          'A path to a nested object, such as "key1.key2.key3".',
+                      },
+                      value: {
+                        type: "string",
+                        descripntion: "The value to set. if null, delete.",
+                      },
+                    },
+                  },
+                  {
+                    properties: {
+                      type: {
+                        type: "string",
+                        const: "math",
+                      },
+                      expression: {
+                        type: "string",
+                      },
+                    },
+                  },
+                  {
+                    properties: {
+                      type: {
+                        type: "string",
+                        const: "url.get",
+                      },
+                      url: {
+                        type: "string",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          required: ["summary", "responseNeeded", "responseNeededBecause"],
+        },
+      }),
+    },
+    //     {
+    //       role: "system",
+    //       content: `${summaryContent}
+    // You should take an action, ${responseNeededBecause}
+
+    // Your response should be a JSON format below.
+
+    // \`\`\`typescript
+    // type Command={type:"chat";text:string}|{type:"setting.set";key:string;value:string}|{type:"memory.set";key:string;value:string}|{type:"memory.read";key:string}|{type:"math";expression:string}|{type:"url.get";url:string};type Response={commands:Command[]};
+    // \`\`\`
+
+    // "commands" will execute in order. "key" can be a path to a nested object, such as "key1.key2.key3". To delete a value, set value to null. The commands will be executed and the result will be returned. You can use "<@user_id>" to mention the user in a chat text. Send the next commands according to the result. if you have nothing to do, you can wait for the next input by returning an empty commands. The response should be minified.
+
+    // Your current settings and memory keys are as follows.
+
+    // Chatbot settings: ${JSON.stringify(settings)}
+    // Chatbot Memory keys: ${JSON.stringify(chatbotMemoryKeys)}
+    // `,
+    //     },
+  ]);
   for (let i = 0; i < LOOP_MAX; i++) {
     console.log(JSON.stringify({ messages }, null, 2));
 
@@ -60,6 +242,9 @@ export async function communicateWithAi(initialMessages: Message[]) {
     }
 
     const commands = tryToGetValue(aiResponseObj, "commands");
+
+    console.log(JSON.stringify({ commands }, null, 2));
+
     if (commands == null) {
       throw new Error(`aiResponseObj.commands is undefined`);
     }
@@ -69,10 +254,9 @@ export async function communicateWithAi(initialMessages: Message[]) {
     }
 
     if (commands.length == 0) {
+      console.log("No commands. Waiting for the next input.");
       return;
     }
-
-    console.log(JSON.stringify({ commands }, null, 2));
 
     const results = [];
     for (const command of commands) {
@@ -81,18 +265,29 @@ export async function communicateWithAi(initialMessages: Message[]) {
 
     console.log(JSON.stringify({ results }, null, 2));
 
-    if (results.length == 1 && results[0].type === "chat") {
-      // 喋ったあとは基本的に終了
-      return;
-    }
-  
+    // if (results.length == 1 && results[0].type === "chat") {
+    //   // 喋ったあとは基本的に終了
+    //   return;
+    // }
+
     messages.push({
       role: "assistant",
       content,
     });
     messages.push({
       role: "user",
-      content: JSON.stringify({ results }),
+      content: JSON.stringify({
+        task: "Send the next commands according to the results. If you have nothing to do, return an empty commands.",
+        results,
+        responseSchema: {
+          type: "object",
+          properties: {
+            commands: {
+              type: "array",
+            },
+          },
+        },
+      }),
     });
 
     await sleep(500);

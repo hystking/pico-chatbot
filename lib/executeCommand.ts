@@ -150,22 +150,22 @@ export async function executeCommand(command: unknown) {
           error: "key is not a string",
         };
       }
-      const memories = await Deno.readTextFile(
-        `${workspacePath}/state/memories.json`
+      const memory = await Deno.readTextFile(
+        `${workspacePath}/state/memory.json`
       );
-      const memoriesObj = JSON.parse(memories);
+      const memoryObj = JSON.parse(memory);
 
-      if (typeof memoriesObj !== "object" || memoriesObj == null) {
+      if (typeof memoryObj !== "object" || memoryObj == null) {
         return {
           type: commandType,
-          error: "memories is not an object",
+          error: "memory is not an object",
         };
       }
 
       const keys = commandKey.split(".");
 
       try {
-        setValueToJson(memoriesObj, keys, commandValue);
+        setValueToJson(memoryObj, keys, commandValue);
       } catch (e) {
         return {
           type: commandType,
@@ -174,8 +174,8 @@ export async function executeCommand(command: unknown) {
       }
 
       await Deno.writeTextFile(
-        `${workspacePath}/state/memories.json`,
-        JSON.stringify(memoriesObj)
+        `${workspacePath}/state/memory.json`,
+        JSON.stringify(memoryObj)
       );
       return { type: commandType, success: `${commandKey} is set.` };
     }
@@ -187,11 +187,11 @@ export async function executeCommand(command: unknown) {
           error: "key is not a string",
         };
       }
-      const memories = await Deno.readTextFile(
-        `${workspacePath}/state/memories.json`
+      const memory = await Deno.readTextFile(
+        `${workspacePath}/state/memory.json`
       );
       const value = tryToGetValue(
-        JSON.parse(memories),
+        JSON.parse(memory),
         ...commandKey.split(".")
       );
       if (value == null) {
@@ -200,9 +200,11 @@ export async function executeCommand(command: unknown) {
           error: `${commandKey} is not found.`,
         };
       }
+
+      const valueInString = typeof value === "object" ? JSON.stringify(value) : value.toString();
       return {
         type: commandType,
-        success: `${commandKey} is "${value.toString()}".`,
+        success: `${commandKey} is ${valueInString}.`,
       };
     }
     case "math": {
@@ -254,14 +256,12 @@ export async function executeCommand(command: unknown) {
         document.querySelector("meta[name=description]")?.textContent ?? ""
       );
 
-      const elements: { tag: string; text: string }[] = [];
+      const elements: string[][] = [];
       document.querySelectorAll("h1, h2, h3, p")?.forEach((element) => {
-        elements.push({
-          tag: element.nodeName.toLowerCase(),
-          text: Array.from(cleanUpText(element.textContent))
-            .splice(0, 128)
-            .join(""),
-        });
+        elements.push([
+          element.nodeName.toLowerCase(),
+          Array.from(cleanUpText(element.textContent)).splice(0, 128).join(""),
+        ]);
       });
       return {
         type: commandType,

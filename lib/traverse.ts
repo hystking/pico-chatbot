@@ -1,6 +1,5 @@
 export function traverse(
-  // deno-lint-ignore ban-types
-  object: object,
+  object: unknown,
   callback: (path: string[], obj: unknown) => void,
   path: string[] = []
 ) {
@@ -11,9 +10,7 @@ export function traverse(
     Object.keys(object).forEach((key) => {
       if (key in object) {
         const value = (object as Record<string, unknown>)[key];
-        if (value != null && typeof value === "object") {
-          traverse(value, callback, path.concat(key));
-        }
+        traverse(value, callback, path.concat(key));
       }
     });
   }

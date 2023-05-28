@@ -11,3 +11,27 @@ interface JSON {
 interface Response {
   json(): Promise<unknown>;
 }
+
+type Message = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+type ChatContext = {
+  time: string;
+};
+
+type Chatbot = {
+  userId: string;
+  name: string;
+};
+
+type User = {
+  name: string;
+};
+
+type ChatMessage = {
+  userId: string;
+  time: string;
+  text: string;
+};
