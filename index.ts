@@ -1,13 +1,17 @@
 import { sleep } from "./lib/sleep.ts";
 import { requestToSlack } from "./lib/requestToSlack.ts";
 import { getPrettyJapanDatetimeString } from "./lib/getPrettyJapanDatetimeString.ts";
-import { communicateWithAi } from "./lib/communicateWithAi.ts";
+import { runChatbotAgent } from "./lib/runChatbotAgent.ts";
 import { workspacePath } from "./lib/workspacePath.ts";
-import { tryToGetValue } from "./lib/tryToGetValue.ts";
+import { tryToGetValueFromJson } from "./lib/tryToGetValueFromJson.ts";
 
 const SLACK_CHANNEL_ID = Deno.env.get("SLACK_CHANNEL_ID");
 
 async function main() {
+  if (SLACK_CHANNEL_ID == null) {
+    throw new Error("SLACK_CHANNEL_ID is not set");
+  }
+
   const conversationsHistory = await requestToSlack(
     "/api/conversations.history",
     "POST",
@@ -19,16 +23,16 @@ async function main() {
     }
   );
 
-  if (!tryToGetValue(conversationsHistory, "ok")) {
+  if (!tryToGetValueFromJson(conversationsHistory, "ok")) {
     throw new Error(
-      `conversationsHistory.ok is false: ${tryToGetValue(
+      `conversationsHistory.ok is false: ${tryToGetValueFromJson(
         conversationsHistory,
         "error"
       )?.toString()}`
     );
   }
 
-  const conversationsHistoryMessages = tryToGetValue(
+  const conversationsHistoryMessages = tryToGetValueFromJson(
     conversationsHistory,
     "messages"
   );
@@ -53,7 +57,7 @@ async function main() {
     console.log("No lastMessageTs.txt");
   }
 
-  const firstConversationsHistoryMessagesTs = tryToGetValue(
+  const firstConversationsHistoryMessagesTs = tryToGetValueFromJson(
     conversationsHistoryMessages[0],
     "ts"
   );
@@ -81,9 +85,9 @@ async function main() {
     {}
   );
 
-  if (!tryToGetValue(botProfileResponse, "ok")) {
+  if (!tryToGetValueFromJson(botProfileResponse, "ok")) {
     throw new Error(
-      `botInfo.ok is false: ${tryToGetValue(
+      `botInfo.ok is false: ${tryToGetValueFromJson(
         botProfileResponse,
         "error"
       )?.toString()}`
@@ -91,21 +95,24 @@ async function main() {
   }
 
   if (
-    tryToGetValue(conversationsHistoryMessages[0], "bot_profile", "id") ===
-    tryToGetValue(botProfileResponse, "profile", "bot_id")
+    tryToGetValueFromJson(
+      conversationsHistoryMessages[0],
+      "bot_profile",
+      "id"
+    ) === tryToGetValueFromJson(botProfileResponse, "profile", "bot_id")
   ) {
     console.log("Bot has already spoken");
     return;
   }
 
-  const botUserId = tryToGetValue(
-    conversationsHistoryMessages.find(
-      (message) =>
-        tryToGetValue(message, "bot_profile", "id") ===
-        tryToGetValue(botProfileResponse, "profile", "bot_id")
-    ),
-    "user"
+  const botProfile = conversationsHistoryMessages.find(
+    (message) =>
+      tryToGetValueFromJson(message, "bot_profile", "id") ===
+      tryToGetValueFromJson(botProfileResponse, "profile", "bot_id")
   );
+
+  const botUserId =
+    botProfile == null ? null : tryToGetValueFromJson(botProfile, "user");
 
   if (typeof botUserId !== "string") {
     throw new Error(`botUserId is not a string: ${botUserId?.toString()}`);
@@ -114,10 +121,10 @@ async function main() {
   const uniqueUsers = conversationsHistoryMessages
     .filter(
       (message) =>
-        tryToGetValue(message, "bot_profile", "id") !==
-        tryToGetValue(botProfileResponse, "profile", "bot_id")
+        tryToGetValueFromJson(message, "bot_profile", "id") !==
+        tryToGetValueFromJson(botProfileResponse, "profile", "bot_id")
     )
-    .map((message) => tryToGetValue(message, "user"))
+    .map((message) => tryToGetValueFromJson(message, "user"))
     .filter((user, index, array) => array.indexOf(user) === index);
 
   const userProfiles = await Promise.all(
@@ -131,12 +138,16 @@ async function main() {
         "GET",
         { searchParams: new URLSearchParams({ user }) }
       );
-      const display_name = tryToGetValue(
+      const display_name = tryToGetValueFromJson(
         userProfile,
         "profile",
         "display_name"
       );
-      const real_name = tryToGetValue(userProfile, "profile", "real_name");
+      const real_name = tryToGetValueFromJson(
+        userProfile,
+        "profile",
+        "real_name"
+      );
       return {
         display_name,
         real_name,
@@ -146,8 +157,8 @@ async function main() {
   );
 
   const botName =
-    tryToGetValue(botProfileResponse, "profile", "display_name") ||
-    tryToGetValue(botProfileResponse, "profile", "real_name") ||
+    tryToGetValueFromJson(botProfileResponse, "profile", "display_name") ||
+    tryToGetValueFromJson(botProfileResponse, "profile", "real_name") ||
     "Chatbot";
 
   if (typeof botName !== "string") {
@@ -158,11 +169,15 @@ async function main() {
     await Deno.readTextFile(`${workspacePath}/state/settings.json`)
   );
 
-  if (typeof settings !== "object" || settings == null) {
+  if (
+    typeof settings !== "object" ||
+    settings == null ||
+    Array.isArray(settings)
+  ) {
     throw new Error(`settings is not an object: ${settings?.toString()}`);
   }
 
-  await communicateWithAi({
+  const { aiMessages, newSettings } = await runChatbotAgent({
     context: {
       time: getPrettyJapanDatetimeString(new Date()),
     },
@@ -183,15 +198,15 @@ async function main() {
     chatMessages: Array.from(conversationsHistoryMessages)
       .reverse()
       .map((message) => {
-        const ts = tryToGetValue(message, "ts");
-        const text = tryToGetValue(message, "text");
+        const ts = tryToGetValueFromJson(message, "ts");
+        const text = tryToGetValueFromJson(message, "text");
         if (typeof ts !== "number" && typeof ts !== "string") {
           throw new Error(`ts is not a number or string: ${ts?.toString()}`);
         }
         if (typeof text !== "string") {
           throw new Error(`text is not a string: ${text?.toString()}`);
         }
-        const userId = tryToGetValue(message, "user") || undefined;
+        const userId = tryToGetValueFromJson(message, "user") || undefined;
         if (typeof userId !== "string") {
           throw new Error(`userId is not a string: ${userId?.toString()}`);
         }
@@ -205,9 +220,10 @@ async function main() {
       }),
   });
 
+  console.log(JSON.stringify(aiMessages, null, 2));
   await Deno.writeTextFile(
     `${workspacePath}/state/settings.json`,
-    JSON.stringify(settings, null, 2)
+    JSON.stringify(newSettings, null, 2)
   );
 }
 

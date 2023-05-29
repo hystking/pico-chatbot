@@ -1,37 +1,75 @@
+type JsonPrimitive = string | number | boolean | null;
+
+type JsonObject = { [key: string]: JsonValue };
+
+type JsonArray = JsonValue[];
+
+type JsonValue = JsonPrimitive | JsonArray | JsonObject;
+
 interface ArrayConstructor {
   // deno-lint-ignore no-explicit-any
-  isArray(arg: any): arg is unknown[];
+  isArray<T>(arg: any): arg is T[];
 }
 
 interface JSON {
   // deno-lint-ignore no-explicit-any
-  parse(text: string, reviver?: (key: any, value: any) => any): unknown;
+  parse(text: string, reviver?: (key: any, value: any) => any): JsonValue;
+  stringify(
+    value: JsonObject,
+    replacer: (key: string, value: JsonValue) => JsonValue,
+    space: number
+  ): string;
 }
 
 interface Response {
-  json(): Promise<unknown>;
+  json(): Promise<JsonValue>;
 }
 
-type Message = {
-  role: "user" | "assistant" | "system";
-  content: string;
+type AiMessage = {
+  readonly role: "user" | "assistant" | "system";
+  readonly content: string;
 };
 
 type ChatContext = {
-  time: string;
+  readonly time: string;
 };
 
 type Chatbot = {
-  userId: string;
-  name: string;
+  readonly userId: string;
+  readonly name: string;
 };
 
 type User = {
-  name: string;
+  readonly name: string;
 };
 
 type ChatMessage = {
-  userId: string;
-  time: string;
-  text: string;
+  readonly userId: string;
+  readonly time: string;
+  readonly text: string;
+};
+
+type CommandPrototypeExecuteResult<CommandType extends string> = {
+  readonly type: CommandType;
+  readonly error?: JsonValue;
+  readonly success?: JsonValue;
+};
+
+type CommandPrototype<CommandType extends string> = {
+  readonly schema: {
+    readonly properties: {
+      readonly type: {
+        readonly type: "string";
+        readonly const: CommandType;
+      };
+      readonly [key: string]: JsonValue;
+    };
+  };
+  execute: (props: {
+    readonly type: CommandType;
+    readonly params: JsonObject;
+    readonly settings: JsonObject;
+  }) =>
+    | Promise<CommandPrototypeExecuteResult<CommandType>>
+    | CommandPrototypeExecuteResult<CommandType>;
 };

@@ -8,17 +8,13 @@ export function requestToSlack(
   {
     bodyObj,
     searchParams,
-  }: // deno-lint-ignore ban-types
-  { bodyObj?: object; searchParams?: URLSearchParams }
+  }: { bodyObj?: JsonObject; searchParams?: URLSearchParams }
 ) {
   console.log({
     function: "requestToSlack",
     pathname,
     method,
   });
-  if (bodyObj != null && typeof bodyObj !== "object") {
-    throw new Error("bodyObj must be an object");
-  }
   const bodyString = JSON.stringify(bodyObj);
 
   const headers =
