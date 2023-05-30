@@ -20,15 +20,29 @@ const COMMAND_PROTOTYPES = [
  */
 export async function runChatbotAgent({
   context,
-  chatbot,
-  users,
+  chatbotProfile,
+  userProfiles,
   chatMessages,
   settings,
 }: {
-  context: ChatContext;
-  chatbot: Chatbot;
-  users: Record<string, User>;
-  chatMessages: ChatMessage[];
+  context: {
+    readonly time: string;
+  };
+  chatbotProfile: {
+    readonly userId: string | undefined;
+    readonly name: string | undefined;
+  };
+  userProfiles: Record<
+    string,
+    {
+      readonly name: string | undefined;
+    }
+  >;
+  chatMessages: {
+    readonly userId: string;
+    readonly time: string;
+    readonly text: string;
+  }[];
   settings: JsonObject;
 }) {
   const newSettings = JSON.parse(JSON.stringify(settings));
@@ -53,8 +67,8 @@ export async function runChatbotAgent({
         task: 'An illustration of your participation in the chat scenario is represented in "conversation". Begin by succinctly describing the flow of the conversation. Next, within the conversation, is there anyone who needs your help? Or, regardless of that, are you likely to do something next? Respond while respecting the settings. Then, if you need something to do, provide commands to acomplish the task.',
         conversation: {
           context,
-          chatbot,
-          users,
+          chatbotProfile,
+          userProfiles,
           chatMessages,
         },
         settings: newSettings,

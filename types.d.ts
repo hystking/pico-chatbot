@@ -1,3 +1,6 @@
+// deno-lint-ignore no-explicit-any
+type PromiseReturnType<T1 extends (...args: any) => any> = ReturnType<T1> extends Promise<infer T2> ? T2 : never;
+
 type JsonPrimitive = string | number | boolean | null;
 
 type JsonObject = { [key: string]: JsonValue };
@@ -28,25 +31,6 @@ interface Response {
 type AiMessage = {
   readonly role: "user" | "assistant" | "system";
   readonly content: string;
-};
-
-type ChatContext = {
-  readonly time: string;
-};
-
-type Chatbot = {
-  readonly userId: string;
-  readonly name: string;
-};
-
-type User = {
-  readonly name: string;
-};
-
-type ChatMessage = {
-  readonly userId: string;
-  readonly time: string;
-  readonly text: string;
 };
 
 type CommandPrototypeExecuteResult<CommandType extends string> = {
