@@ -1,3 +1,14 @@
+/**
+ * @description
+ * Get a pretty datetime string in Japan.
+ * @example
+ * ```ts
+ * import { getPrettyJapanDatetimeString } from "./getPrettyJapanDatetimeString.ts";
+ * const date = new Date();
+ * const prettyDatetimeString = getPrettyJapanDatetimeString(date);
+ * console.log(prettyDatetimeString); // "2021/10/10 12:34:56"
+ * ```
+ */
 export function getPrettyJapanDatetimeString(date: Date) {
   // cancel timezone offset
   const utcDate = new Date(

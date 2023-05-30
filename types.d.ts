@@ -65,7 +65,7 @@ type CommandPrototype<CommandType extends string> = {
       readonly [key: string]: JsonValue;
     };
   };
-  execute: (props: {
+  readonly execute: (props: {
     readonly type: CommandType;
     readonly params: JsonObject;
     readonly settings: JsonObject;

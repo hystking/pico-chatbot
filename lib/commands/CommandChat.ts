@@ -3,6 +3,10 @@ import { tryToGetValueFromJson } from "../tryToGetValueFromJson.ts";
 
 const SLACK_CHANNEL_ID = Deno.env.get("SLACK_CHANNEL_ID");
 
+/**
+ * @description
+ * Request to Slack API
+ */
 export const CommandChat: CommandPrototype<"chat"> = {
   schema: {
     properties: {

@@ -41,6 +41,10 @@ function setValueToJson(
   }
 }
 
+/**
+ * @description
+ * Set a value to settings.
+ */
 export const CommandSettingsSet: CommandPrototype<"settings.set"> = {
   schema: {
     properties: {

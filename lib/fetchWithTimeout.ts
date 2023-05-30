@@ -1,3 +1,12 @@
+/**
+ * @description
+ * Fetch with timeout.
+ * @example
+ * ```ts
+ * import { fetchWithTimeout } from "./fetchWithTimeout.ts";
+ * const response = await fetchWithTimeout("https://example.com", {}, 1000);
+ * ```
+ */
 export function fetchWithTimeout(
   url: string,
   options: RequestInit,

@@ -1,3 +1,20 @@
+
+/**
+ * @description
+ * Try to get a value from an unknown object. if the value is not found, return undefined.
+ * @example
+ * ```ts
+ * import { tryToGetValue } from "./tryToGetValue.ts";
+ * const obj = {
+ *   key1: {
+ *     key2: {
+ *       key3: "value",
+ *     },
+ *   },
+ * };
+ * const value = tryToGetValue(obj, "key1", "key2", "key3");
+ * console.log(value); // "value"
+ */
 export function tryToGetValue(obj: unknown, ...keys: string[]) {
   let value: unknown = obj;
   for (const key of keys) {

@@ -1,4 +1,21 @@
-export function tryToGetValueFromJson(obj: JsonValue, ...keys: string[]) {
+/**
+ * @description
+ * Try to get a value from a json object. if the value is not found, return undefined.
+ * @example
+ * ```ts
+ * import { tryToGetValueFromJson } from "./tryToGetValueFromJson.ts";
+ * const obj = {
+ *   key1: {
+ *     key2: {
+ *       key3: "value",
+ *     },
+ *   },
+ * };
+ * const value = tryToGetValueFromJson(obj, "key1", "key2", "key3");
+ * console.log(value); // "value"
+ * ```
+ */
+export function tryToGetValueFromJson(obj: JsonValue, ...keys: string[]): JsonValue | undefined {
   let value: JsonValue = obj;
   for (const key of keys) {
     if (

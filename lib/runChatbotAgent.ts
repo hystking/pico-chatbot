@@ -14,6 +14,10 @@ const COMMAND_PROTOTYPES = [
   CommandWebGet,
 ] as const;
 
+/**
+ * @description
+ * Run the chatbot agent. The agent executes the commands and responds to the user.
+ */
 export async function runChatbotAgent({
   context,
   chatbot,

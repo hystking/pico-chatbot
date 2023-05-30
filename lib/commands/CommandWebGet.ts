@@ -10,6 +10,10 @@ function cleanUpText(text: string) {
     .join("\n");
 }
 
+/**
+ * @description
+ * Get the title, description, headings, and paragraphs from the web page.
+ */
 export const CommandWebGet: CommandPrototype<"web.get"> = {
   schema: {
     properties: {

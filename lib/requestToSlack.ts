@@ -2,6 +2,24 @@ import { fetchWithTimeout } from "./fetchWithTimeout.ts";
 
 const SLACK_APP_OAUTH_TOKEN = Deno.env.get("SLACK_APP_OAUTH_TOKEN");
 
+/**
+ * @description
+ * Request to Slack API
+ * @example
+ * ```ts
+ * import { requestToSlack } from "./requestToSlack.ts";
+ * const chatPostMessage = await requestToSlack(
+ *    "/api/chat.postMessage",
+ *    "POST",
+ *    {
+ *      bodyObj: {
+ *        channel: SLACK_CHANNEL_ID,
+ *        text: commandText,
+ *      },
+ *    }
+ *  );
+ * ```
+ */
 export function requestToSlack(
   pathname: string,
   method: string,

@@ -1,6 +1,10 @@
 import { tryToGetValue } from "../tryToGetValue.ts";
 import { tryToGetValueFromJson } from "../tryToGetValueFromJson.ts";
 
+/**
+ * @description
+ * Run a javascript expression.
+ */
 export const CommandCalculate: CommandPrototype<"calculate"> = {
   schema: {
     properties: {
